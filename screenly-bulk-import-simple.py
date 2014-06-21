@@ -38,7 +38,6 @@ import os
 import shutil
 import datetime
 import uuid
-import os
 import os.path
 import sqlite3
 from contextlib import contextmanager
@@ -87,78 +86,82 @@ conn = sqlite3.connect(dbFile, detect_types=sqlite3.PARSE_DECLTYPES)
 # This function copied from screenly-ose/db.py
 @contextmanager
 def cursor(connection):
-    cur = connection.cursor()
-    yield cur
-    cur.close()
+  cur = connection.cursor()
+  yield cur
+  cur.close()
 
 # This function copied from screenly-ose/db.py
 @contextmanager
 def commit(connection):
-    cur = connection.cursor()
-    yield cur
-    connection.commit()
-    cur.close()
+  cur = connection.cursor()
+  yield cur
+  connection.commit()
+  cur.close()
 
 # SQL code derived from screenly-ose/asset_helpers.py
 # Create sqlite db if it doesnt exist yet
 with cursor(conn) as c:
-    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='assets'")
-    if c.fetchone() is None:
-        c.execute( 'CREATE TABLE assets(' + \
-          'asset_id text primary key, name text, uri text, md5 text, ' + \
-          'start_date timestamp, end_date timestamp, duration text, ' + \
-          'mimetype text, is_enabled integer default 0, ' + \
-          'nocache integer default 0, play_order integer default 0)')
+  c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='assets'")
+  if c.fetchone() is None:
+    c.execute( 'CREATE TABLE assets(' + \
+      'asset_id text primary key, name text, uri text, md5 text, ' + \
+      'start_date timestamp, end_date timestamp, duration text, ' + \
+      'mimetype text, is_enabled integer default 0, ' + \
+      'nocache integer default 0, play_order integer default 0)')
 
 # This takes a key value pair structure and converts it into a SQL insert statement
 comma = ','.join
 create = lambda keys: 'insert into assets (' + comma(keys) + ') values (' + comma(['?'] * len(keys)) + ')'
 
+# To check what is going on:
+#
+#   sqlite3 screenly.db "select * from assets" (etc)
+
 # Traverse directory
 imagesDir = sys.argv[1]
 for directory, sub, files in os.walk(imagesDir):
-    for filename in files:
-      imagePath = os.path.join(directory, filename)
-      #        print('%s' % os.path.join(directory, filename))
-      # Generate asset hash
-      assetHash = uuid.uuid4().hex
+  for filename in files:
+    imagePath = os.path.join(directory, filename)
+    #        print('%s' % os.path.join(directory, filename))
+    # Generate asset hash
+    assetHash = uuid.uuid4().hex
 
-      # TODO test we haven't already got one by some incredible fluke
-      #      For the moment, we effectively replace
-      
-      # Copy image to asset directory
-      assetDest = os.path.join(assetDir, assetHash)
-      # shutil.copyfile( imagePath, assetDest)
+    # TODO test we haven't already got one by some incredible fluke
+    #      For the moment, we effectively replace
+    
+    # Copy image to asset directory
+    assetDest = os.path.join(assetDir, assetHash)
+    # shutil.copyfile( imagePath, assetDest)
 
-      # Imagemagick operations - shrink / extend size and reduce resolution of large images
-      # 1. Put a gold banner at top of black screen
-      # 2. Put image in middle.
-      # 3. Assume capable of running in 1920x1080
-      cmd = "convert \\( -background black -fill \"#fff725\" -font \"%s\" -pointsize 128 -gravity Center -size 1920x180 " \
-                       "caption:\"%s\" -gravity North -extent 1920x1080 \\) " \
-                    "\\( \"%s\" -resize 1664x768 -background black -compose Copy -gravity Center -extent 1920x900 \\) " \
-                    "-background blue -gravity South -composite \"jpeg:%s\"" % (bannerFont, bannerText, imagePath, assetDest)
-      #print cmd
-      os.system(cmd)
+    # Imagemagick operations - shrink / extend size and reduce resolution of large images
+    # 1. Put a gold banner at top of black screen
+    # 2. Put image in middle.
+    # 3. Assume capable of running in 1920x1080
+    cmd = "convert \\( -background black -fill \"#fff725\" -font \"%s\" -pointsize 128 -gravity Center -size 1920x180 " \
+                     "caption:\"%s\" -gravity North -extent 1920x1080 \\) " \
+                  "\\( \"%s\" -resize 1664x768 -background black -compose Copy -gravity Center -extent 1920x900 \\) " \
+                  "-background blue -gravity South -composite \"jpeg:%s\"" % (bannerFont, bannerText, imagePath, assetDest)
+    #print cmd
+    os.system(cmd)
 
-      # TODO: if command fails, dont add to database
+    # TODO: if command fails, dont add to database
 
-      # Generate entry in database
-      title = filename
-      asset = {
-          'asset_id': assetHash,
-          'name': title,
-          'uri': os.path.join(targetAssetPath, assetHash),
-          'start_date': start,
-          'end_date': finish,
-          'duration': imageDuration,
-          'mimetype': "image",
-          'is_enabled': 1
-      }
-      with commit(conn) as c:
-        c.execute(create(asset.keys()), asset.values())
+    # Generate entry in database
+    title = filename
+    asset = {
+        'asset_id': assetHash,
+        'name': title,
+        'uri': os.path.join(targetAssetPath, assetHash),
+        'start_date': start,
+        'end_date': finish,
+        'duration': imageDuration,
+        'mimetype': "image",
+        'is_enabled': 1
+    }
+    with commit(conn) as c:
+      c.execute(create(asset.keys()), asset.values())
 
-      # TODO: make this optional
-      print "Imported: %s --> %s" % (title, assetHash)
+    # TODO: make this optional
+    print "Imported: %s --> %s" % (title, assetHash)
 
 # TODO: pre-scan directory so instead we can print a progressive count.
