@@ -141,6 +141,8 @@ for directory, sub, files in os.walk(imagesDir):
       #print cmd
       os.system(cmd)
 
+      # TODO: if command fails, dont add to database
+
       # Generate entry in database
       title = filename
       asset = {
@@ -156,5 +158,7 @@ for directory, sub, files in os.walk(imagesDir):
       with commit(conn) as c:
         c.execute(create(asset.keys()), asset.values())
 
+      # TODO: make this optional
       print "Imported: %s --> %s" % (title, assetHash)
 
+# TODO: pre-scan directory so instead we can print a progressive count.
