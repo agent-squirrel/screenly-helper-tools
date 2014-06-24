@@ -12,9 +12,17 @@
 # 2. Change into that directory
 # 3. Copy an existing sqlite.db there if required
 # 4. Run this script
+#
+#    ../screenly-tools/screenly-bulk-import-simple.py BaseImagesDir/ " Some Title "
+#
 # 5. This script will create assets/ relative to the working directory
 #
-# When finished, copy assets/* into assets/ on the destination RPi
+# It is advisable to have a space around the text in case the television doesnt size properly.#
+#
+# When finished, copy screenly_assets/* into screenly_assets/ on the destination RPi
+# It will then be necessary to reset the timestamp of screenly.db to before 
+# the time set in /etc/fake-hwclock.data if there is no network with NTP synchronisation,
+# otherwise screenly will continually think the database has changed and reset to the start
 #
 # To simplify deployment, this process can be run on a normal Linux PC
 # and the sqlite db and assets/ files copied to the RPi after
@@ -25,7 +33,6 @@
 # 3. Copy to screenly_assets directory
 # 4. Add to sqlite database
 # 5. Preset the start date to 1/1/2014 and the end date to show until 31/12/2029
-# 6. Randomise the order
 #
 __author__ = "Andrew McDonnell"
 __copyright__ = "Copyright 2014"
@@ -119,6 +126,7 @@ create = lambda keys: 'insert into assets (' + comma(keys) + ') values (' + comm
 
 # Traverse directory
 imagesDir = sys.argv[1]
+order = 1
 for directory, sub, files in os.walk(imagesDir):
   for filename in files:
     imagePath = os.path.join(directory, filename)
@@ -137,9 +145,9 @@ for directory, sub, files in os.walk(imagesDir):
     # 1. Put a gold banner at top of black screen
     # 2. Put image in middle.
     # 3. Assume capable of running in 1920x1080
-    cmd = "convert \\( -background black -fill \"#fff725\" -font \"%s\" -pointsize 128 -gravity Center -size 1920x180 " \
-                     "caption:\"%s\" -gravity North -extent 1920x1080 \\) " \
-                  "\\( \"%s\" -resize 1664x768 -background black -compose Copy -gravity Center -extent 1920x900 \\) " \
+    cmd = "convert \\( -background black -fill \"#fff725\" -font \"%s\" -pointsize 116 -gravity Center -size 1840x180 " \
+                     "caption:\"%s\" -gravity North -extent 1840x1080 \\) " \
+                  "\\( \"%s\" -resize 1664x728 -background black -compose Copy -gravity Center -extent 1920x860 \\) " \
                   "-background blue -gravity South -composite \"jpeg:%s\"" % (bannerFont, bannerText, imagePath, assetDest)
     #print cmd
     os.system(cmd)
@@ -153,6 +161,7 @@ for directory, sub, files in os.walk(imagesDir):
         'name': title,
         'uri': os.path.join(targetAssetPath, assetHash),
         'start_date': start,
+        'play_order': order,
         'end_date': finish,
         'duration': imageDuration,
         'mimetype': "image",
@@ -163,5 +172,7 @@ for directory, sub, files in os.walk(imagesDir):
 
     # TODO: make this optional
     print "Imported: %s --> %s" % (title, assetHash)
+
+    order = order + 1
 
 # TODO: pre-scan directory so instead we can print a progressive count.
